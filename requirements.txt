@@ -1,0 +1,17 @@
+websocket-client==1.8.0
+websockets==15.0.1
+python-dotenv==1.1.1
+
+fastapi==0.116.1
+uvicorn==0.35.0
+anyio==4.9.0
+influxdb-client==1.49.0
+
+# Development and testing dependencies
+pytest==8.3.4
+pytest-asyncio==0.24.0
+httpx==0.28.1
+
+# Production and monitoring
+python-multipart==0.0.18
+pydantic==2.10.4
