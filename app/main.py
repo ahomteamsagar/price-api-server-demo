@@ -4,7 +4,7 @@ from forex_python.converter import CurrencyRates
 from influxdb_client import InfluxDBClient
 from enum import Enum
 from dotenv import load_dotenv
-import os
+import os,datetime
 
 app = FastAPI()
 c = CurrencyRates()
@@ -37,7 +37,21 @@ class FIAT(Enum):
     CAD = 'CAD'
     AUD = 'AUD'
     AED = 'AED'
-
+crypto_map= {
+    "btc":TICKERS.BTCUSDT.value,
+    "eth":TICKERS.ETHUSDT.value
+}
+fiat_map= {
+    "usd":FIAT.USD.value,
+    "eur":FIAT.EUR.value,
+    "gbp":FIAT.GBP.value,
+    "jpy":FIAT.JPY.value,
+    "chf":FIAT.CHF.value,
+    "cny":FIAT.CNY.value,
+    "cad":FIAT.CAD.value,
+    "aud":FIAT.AUD.value,
+    "aed":FIAT.AED.value
+}
 
 def success_respone(msg: any):
     return {
@@ -97,8 +111,8 @@ def get_price(symbol: str):
                     return {
                         "symbol": symbol,
                         "lastPrice": record.get_value(),
-                        "lastUpdateTime": record.values.get("lastUpdateTime") if "lastUpdateTime" in record.values else None,
-                        "time": str(record.get_time())
+                        "time": str(datetime.datetime.now(tz=datetime.timezone.utc)),
+                        "lastSnapshotTime":"10s"  # Placeholder for last update time
                     }
             if not found:
                 print(f"No data found for symbol: {symbol}")  # Debug log
@@ -110,26 +124,30 @@ def get_price(symbol: str):
 
 @app.get('/api/v1/lastprice/{symbol}')
 def get_price_by_symbol(symbol: str):
-    result = get_price(symbol)
+    ticker = crypto_map.get(symbol.lower())
+    result = get_price(ticker)
     if "error" in result:
         return error_respone(result["error"])
     return success_respone(result)
 
 
-@app.get('/api/v1/fiat/{symbol}')
-def get_fiat_price_by_symbol(symbol: str):
+@app.get('/api/v1/crypto/fiat/{symbol}/{fiat}')
+def get_fiat_price_by_symbol(symbol: str,fiat: str):
     try:
-        # Validate symbol using FIAT enum
-        base = symbol[:3]
-        quote = symbol[3:]
-        result = get_price(base+quote)
-
+        ticker = crypto_map.get(symbol.lower())
+        result = get_price(ticker)
+        fiat_code = fiat_map.get(fiat.lower())
+        rate = c.get_rate(FIAT.USD.value,fiat_code)  # Example conversion
+        converted_price = result['lastPrice'] * rate if 'lastPrice' in result else 0
+        result["lastPrice"] = converted_price
+        result["currency"] = fiat
         if "error" in result:
             return error_respone(result["error"])
         return success_respone(result)
 
     except Exception as e:
         return error_respone(str(e))
+
 
 
 @app.websocket('/ws')
@@ -139,8 +157,9 @@ async def websocket_router(websocket: WebSocket):
     try:
         data = await websocket.receive_json()
         symbol = data.get('symbol', 'UNKNOWN')
+        ticker= crypto_map.get(symbol.lower())  # Default to BTCUSDT if symbol not found
         while True:
-            result = get_price(symbol)
+            result = get_price(ticker)
 
             # Broadcast the dummy data to all connected clients
             await manager.broadcast({
