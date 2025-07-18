@@ -1,4 +1,5 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from .utils import get_exchange_rate
 import asyncio
 from forex_python.converter import CurrencyRates
 from influxdb_client import InfluxDBClient
@@ -137,7 +138,7 @@ def get_fiat_price_by_symbol(symbol: str,fiat: str):
         ticker = crypto_map.get(symbol.lower())
         result = get_price(ticker)
         fiat_code = fiat_map.get(fiat.lower())
-        rate = c.get_rate(FIAT.USD.value,fiat_code)  # Example conversion
+        rate = get_exchange_rate("USD",fiat_code)  # Example conversion
         converted_price = result['lastPrice'] * rate if 'lastPrice' in result else 0
         result["lastPrice"] = converted_price
         result["currency"] = fiat
